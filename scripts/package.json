@@ -1,0 +1,12 @@
+{
+  "name": "encomendas-apmg-rotinas",
+  "private": true,
+  "type": "module",
+  "description": "Rotinas agendadas do app (GitHub Actions)",
+  "scripts": {
+    "avisos": "node enviar-avisos.mjs"
+  },
+  "dependencies": {
+    "firebase-admin": "^14.5.0"
+  }
+}
