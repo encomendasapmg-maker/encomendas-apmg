@@ -1,0 +1,70 @@
+// Gestão · Cadastros (só administrador): conferência dos cadastros recentes,
+// desativação de cadastros indevidos, perfis fixos e passagem de ano.
+import { useState } from 'react';
+import { query, where } from 'firebase/firestore';
+import { useCadastrosRecentes, definirAtivo, definirPerfil, passagemDeAno, usePessoasAtivas } from '../../dados/pessoas';
+import { col, useAoVivo } from '../../dados/base';
+import { PERFIS } from '../../lib/constantes';
+import { tratamento, descricaoPessoa, quando } from '../../lib/texto';
+import { Topo, Modal, useAcao } from '../../componentes';
+import { useSessao } from '../../sessao';
+
+const NOME_PERFIL = { cadete: 'Cadete', guarda: 'Conta da Guarda', oficial: 'Oficial de Dia', admin: 'Administrador' };
+
+export default function Cadastros() {
+  const { ehAdmin, pessoa: eu } = useSessao();
+  const [recentes] = useCadastrosRecentes(60);
+  const [ativos] = usePessoasAtivas();
+  const [alertas] = useAoVivo(ehAdmin ? query(col('alertas'), where('resolvido', '==', false)) : null, [ehAdmin]);
+  const [passagem, setPassagem] = useState(false);
+  const [executar, ocupado] = useAcao();
+
+  if (!ehAdmin) return <div className="centro">Somente o administrador acessa os cadastros.</div>;
+
+  return (
+    <>
+      <Topo titulo="Cadastros" sobre="Conferência posterior · sem aprovação prévia" voltar={{ rotulo: 'Painel', to: '/gestao' }} />
+      <main className="conteudo">
+        {alertas?.length > 0 && (
+          <div className="caixa-alerta">
+            {alertas.map((a) => <div key={a.id}>Tentativa de repetir o número de cadete {a.numeroCadete} ({a.email}) em {quando(a.em)}.</div>)}
+          </div>
+        )}
+        <span className="rotulo caps">Cadastros recentes</span>
+        {recentes?.map((p) => (
+          <div key={p.id} className="cartao" style={{ opacity: p.ativo ? 1 : 0.6 }}>
+            <div className="linha-entre">
+              <span className="titulo">{tratamento(p)}</span>
+              <span className={`selo ${p.ativo ? 'verde' : 'cinza'}`}>{p.ativo ? 'ativo' : 'inativo'}</span>
+            </div>
+            <span className="muted">{p.nomeCompleto} · nº {p.numeroCadete} · {descricaoPessoa(p)} · {quando(p.criadoEm)}</span>
+            <div className="linha-entre">
+              <label className="campo" style={{ flex: 1 }}>
+                <select value={p.perfil} disabled={p.id === eu.id || ocupado}
+                  onChange={(e) => executar(() => definirPerfil(p.id, e.target.value), 'Perfil atualizado.')}>
+                  {PERFIS.map((x) => <option key={x} value={x}>{NOME_PERFIL[x]}</option>)}
+                </select>
+              </label>
+              {p.id !== eu.id && (
+                <button className={`btn pequeno ${p.ativo ? 'perigo' : ''}`} disabled={ocupado}
+                  onClick={() => executar(() => definirAtivo(p.id, !p.ativo), p.ativo ? 'Cadastro desativado.' : 'Cadastro reativado.')}>
+                  {p.ativo ? 'Desativar' : 'Reativar'}
+                </button>
+              )}
+            </div>
+          </div>
+        ))}
+        <button className="btn neutro" onClick={() => setPassagem(true)}>Passagem de ano (atualizar turmas)</button>
+      </main>
+      {passagem && (
+        <Modal titulo="Passagem de ano" aoFechar={() => setPassagem(false)}>
+          <span className="muted">1º ano passa a 2º, 2º passa a 3º, e o 3º ano é inativado (formados não são apagados). Faça uma vez por ano.</span>
+          <button className="btn perigo" disabled={ocupado}
+            onClick={async () => { if (await executar(() => passagemDeAno(ativos || []), (n) => `${n} cadastro(s) atualizado(s).`)) setPassagem(false); }}>
+            Confirmar passagem de ano
+          </button>
+        </Modal>
+      )}
+    </>
+  );
+}
