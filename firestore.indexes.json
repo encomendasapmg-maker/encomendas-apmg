@@ -1,0 +1,54 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "encomendas",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "destinatarioUid", "order": "ASCENDING" },
+        { "fieldPath": "chegada", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "encomendas",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "situacao", "order": "ASCENDING" },
+        { "fieldPath": "chegada", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "lotes",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "criadoEm", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "pedidosEsperados",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "tipo", "order": "ASCENDING" },
+        { "fieldPath": "ativo", "order": "ASCENDING" },
+        { "fieldPath": "criadoEm", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "pedidosEsperados",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "ativo", "order": "ASCENDING" },
+        { "fieldPath": "validade", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "pessoas",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "ativo", "order": "ASCENDING" },
+        { "fieldPath": "criadoEm", "order": "DESCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}

@@ -1,0 +1,244 @@
+rules_version = '2';
+
+// Regras de acesso do banco de dados (Cloud Firestore).
+// Princípios do documento do projeto:
+//  - cada cadete vê só as próprias encomendas;
+//  - só a Conta da Guarda registra e entrega encomendas;
+//  - funções (Cmt da Guarda, Dia à EsFO, Respondente, Cmt do Bloco) são
+//    escolhidas pelo próprio cadete e liberam a área de Gestão;
+//  - nada é apagado: Movimentação só recebe inclusões (livro digital);
+//  - documento completo do entregador só para o administrador.
+// A rotina agendada (GitHub Actions) usa a conta de serviço e não passa
+// por estas regras.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---------- Quem é quem ----------
+    function logado() { return request.auth != null; }
+    function uid() { return request.auth.uid; }
+    function caminhoDe(colecao, id) { return /databases/$(database)/documents/$(colecao)/$(id); }
+    function eu() { return get(caminhoDe('pessoas', uid())).data; }
+    function cadastrado() { return logado() && exists(caminhoDe('pessoas', uid())); }
+    function ativo() { return cadastrado() && eu().ativo == true; }
+    function perfil() { return eu().perfil; }
+
+    function guarda() { return ativo() && perfil() == 'guarda'; }
+    function admin() { return ativo() && perfil() == 'admin'; }
+    function oficial() { return ativo() && perfil() in ['oficial', 'admin']; }
+    function funcao() { return eu().get('funcao', null); }
+    function gestor() {
+      return oficial() || (ativo() && funcao() in ['cmt_guarda', 'dia_esfo', 'respondente', 'cmt_bloco']);
+    }
+    function podeLote() {
+      return oficial() || (ativo() && funcao() in ['cmt_guarda', 'dia_esfo', 'respondente']);
+    }
+    function cmtBloco() { return ativo() && funcao() == 'cmt_bloco'; }
+
+    function mudou() { return request.resource.data.diff(resource.data).affectedKeys(); }
+    function so(campos) { return mudou().hasOnly(campos); }
+    function novo() { return request.resource.data; }
+
+    // ---------- Pessoas (perfil público: sem e-mail nem celular) ----------
+    match /pessoas/{pessoaId} {
+      allow read: if logado();
+
+      // Autocadastro: acesso imediato, sempre como cadete comum, e o número
+      // do cadete precisa ser reservado na mesma gravação (único).
+      allow create: if logado() && pessoaId == uid()
+        && novo().perfil == 'cadete'
+        && novo().ativo == true
+        && novo().get('funcao', null) == null
+        && novo().numeroCadete is string
+        && getAfter(caminhoDe('numerosCadete', novo().numeroCadete)).data.uid == uid();
+
+      allow update: if
+        // o próprio cadete: dados pessoais e função do dia
+        (pessoaId == uid() && ativo()
+          && so(['nomeCompleto', 'nomeGuerra', 'turma', 'pelotao', 'funcao', 'respondendoPor', 'busca', 'atualizadoEm'])
+          && (novo().get('funcao', null) == null
+              || getAfter(caminhoDe('funcoes', novo().funcao)).data.uid == uid()))
+        // quem assume uma função tira a função de quem estava nela
+        || (logado() && so(['funcao', 'respondendoPor']) && novo().funcao == null
+            && getAfter(caminhoDe('funcoes', resource.data.funcao)).data.uid == uid())
+        // o Oficial de Dia pode retirar a função de quem assumiu indevidamente
+        || (oficial() && so(['funcao', 'respondendoPor']) && novo().funcao == null)
+        // o administrador confere cadastros, inativa e atualiza turma
+        || admin();
+
+      allow delete: if false;
+    }
+
+    // Reserva do número do cadete: o documento só pode ser criado uma vez.
+    match /numerosCadete/{numero} {
+      allow read: if logado();
+      allow create: if logado() && novo().uid == uid();
+      allow update, delete: if admin();
+    }
+
+    // Contato (e-mail e celular) fica separado do perfil público.
+    match /contatos/{pessoaId} {
+      allow read: if pessoaId == uid() || guarda() || gestor();
+      allow write: if pessoaId == uid() || admin();
+    }
+
+    // ---------- Encomendas ----------
+    match /encomendas/{encomendaId} {
+      allow read: if guarda() || gestor() || resource.data.destinatarioUid == uid();
+
+      // Só a guarda registra, e sempre com o nome de quem está no posto.
+      allow create: if guarda()
+        && novo().registradaPor is string && novo().registradaPor.size() > 0
+        && novo().situacao in ['na_guarda', 'a_identificar'];
+
+      allow update: if guarda() || podeLote()
+        // cadete confirma retirada na sala de TV
+        || (resource.data.destinatarioUid == uid()
+            && resource.data.situacao == 'sala_tv'
+            && novo().situacao == 'retirada'
+            && so(['situacao', 'retiradaEm', 'retiradaPor']))
+        // executor do lote dá baixa na sala de TV
+        || (logado() && resource.data.situacao == 'em_lote'
+            && novo().situacao == 'sala_tv'
+            && so(['situacao', 'salaTvEm'])
+            && get(caminhoDe('lotes', resource.data.loteId)).data.executorUid == uid());
+
+      allow delete: if false;
+    }
+
+    // Livro digital: só inclusões, nunca alteração nem exclusão.
+    match /movimentacoes/{movId} {
+      allow read: if guarda() || gestor() || resource.data.destinatarioUid == uid();
+      allow create: if logado() && novo().usuarioUid == uid();
+      allow update, delete: if false;
+    }
+
+    // Avisos ao destinatário (enviados pela rotina agendada).
+    match /avisos/{avisoId} {
+      allow read: if logado() && resource.data.paraUid == uid();
+      allow create: if logado() && novo().enviado == false;
+      allow update: if logado() && resource.data.paraUid == uid() && so(['lido']);
+      allow delete: if false;
+    }
+
+    // Token do celular para notificações (só a rotina agendada lê).
+    match /tokensPush/{pessoaId} {
+      allow read: if false;
+      allow write: if pessoaId == uid();
+    }
+
+    // ---------- Pedido esperado e delivery ----------
+    match /pedidosEsperados/{pedidoId} {
+      allow read: if guarda() || (logado() && resource.data.destinatarioUid == uid());
+      allow create: if logado() && novo().destinatarioUid == uid();
+      allow update: if guarda() || (logado() && resource.data.destinatarioUid == uid());
+      allow delete: if false;
+
+      // Código de confirmação do delivery: só o dono e a guarda; apagado após o uso.
+      match /segredo/{doc} {
+        function dono() { return getAfter(caminhoDe('pedidosEsperados', pedidoId)).data.destinatarioUid == uid(); }
+        allow read: if guarda() || (logado() && dono());
+        allow create: if logado() && dono();
+        allow update: if false;
+        allow delete: if guarda() || (logado() && dono());
+      }
+    }
+
+    // Retirada por terceiro autorizado pelo destinatário.
+    match /autorizacoes/{autId} {
+      allow read: if guarda() || (logado() && (resource.data.destinatarioUid == uid() || resource.data.autorizadoUid == uid()));
+      allow create: if logado() && novo().destinatarioUid == uid();
+      allow update: if logado() && resource.data.destinatarioUid == uid() && so(['ativa', 'encerradaEm']);
+      allow delete: if false;
+    }
+
+    // ---------- Entregadores ----------
+    match /entregadores/{entId} {
+      allow read: if guarda() || gestor();
+      allow create, update: if guarda() || admin();
+      allow delete: if false;
+    }
+    // Documento completo: só o administrador vê (apuração formal).
+    match /entregadoresDocs/{entId} {
+      allow read: if admin();
+      allow create: if guarda();
+      allow update: if admin();
+      allow delete: if false;
+    }
+
+    // ---------- Posto da guarda, contingência e contador ----------
+    match /posto/{doc} {
+      allow read: if logado();
+      allow write: if guarda();
+    }
+    match /postoHistorico/{id} {
+      allow read: if guarda() || gestor();
+      allow create: if guarda();
+      allow update, delete: if false;
+    }
+    match /postoNomes/{id} {
+      allow read: if guarda() || gestor();
+      allow write: if guarda();
+    }
+    match /contingencias/{id} {
+      allow read: if guarda() || gestor();
+      allow create, update: if guarda();
+      allow delete: if false;
+    }
+    match /config/contingencia {
+      allow read: if logado();
+      allow write: if guarda();
+    }
+    // Número interno curto escrito no volume: sobe de 1 em 1.
+    match /config/contador {
+      allow read: if guarda() || gestor();
+      allow create: if guarda() || admin();
+      allow update: if (guarda() && novo().ultimo == resource.data.ultimo + 1) || admin();
+    }
+
+    // ---------- Funções do dia ----------
+    match /funcoes/{funcaoId} {
+      allow read: if logado();
+      allow create, update: if (ativo()
+          && funcaoId in ['cmt_guarda', 'dia_esfo', 'respondente', 'cmt_bloco']
+          && novo().uid == uid())
+        || oficial();
+      allow delete: if (logado() && resource.data.uid == uid()) || oficial();
+    }
+    // Registro de cada assunção de função (só inclusões).
+    match /assuncoes/{id} {
+      allow read: if gestor();
+      allow create: if logado() && novo().usuarioUid == uid();
+      allow update, delete: if false;
+    }
+
+    // ---------- Lote noturno EsFO ----------
+    match /lotes/{loteId} {
+      allow read: if logado();
+      allow create: if podeLote() && novo().status == 'aberto';
+      allow update: if podeLote() || guarda()
+        // executor assume, separa e dá baixa na sala de TV
+        || (ativo()
+            && (resource.data.executorUid == null || resource.data.executorUid == uid())
+            && novo().executorUid == uid()
+            && so(['executorUid', 'executorNome', 'assumidoEm', 'status', 'separados', 'entregueSalaEm']))
+        // Comandante do Bloco confirma o recebimento
+        || (cmtBloco() && resource.data.status == 'entregue'
+            && so(['status', 'recebidoEm', 'recebidoPor', 'recebidoPorUid']));
+      allow delete: if false;
+    }
+
+    // ---------- Administração ----------
+    match /alertas/{id} {
+      allow read: if admin();
+      allow create: if logado();
+      allow update: if admin();
+      allow delete: if false;
+    }
+    match /relatoriosGerados/{id} {
+      allow read: if oficial();
+      allow create: if logado() && novo().usuarioUid == uid();
+      allow update, delete: if false;
+    }
+  }
+}

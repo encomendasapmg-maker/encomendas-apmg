@@ -1,8 +1,10 @@
 node_modules/
+package-lock.json
 dist/
 dev-dist/
 .env.local
 .env.*.local
 *.log
 .firebase/
+# Nunca envie a chave da conta de serviço para o repositório:
 service-account*.json
