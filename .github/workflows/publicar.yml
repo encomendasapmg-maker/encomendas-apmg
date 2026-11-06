@@ -1,6 +1,7 @@
-# Publicação automática: a cada alteração na branch "main", o app é
-# compilado e publicado no Firebase Hosting (https://encomendas-apmg.web.app).
-# Só roda depois que os segredos estiverem configurados (veja o README).
+# Publicação automática no GitHub Pages: a cada alteração na branch "main",
+# o app é compilado e publicado em
+# https://encomendasapmg-maker.github.io/encomendas-apmg/
+# Não precisa de nenhuma chave: usa a permissão própria do GitHub.
 name: Publicar app
 
 on:
@@ -8,11 +9,19 @@ on:
     branches: [main]
   workflow_dispatch: {}
 
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
 jobs:
-  publicar:
+  compilar:
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    if: ${{ vars.PUBLICAR_ATIVO == 'sim' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -20,17 +29,18 @@ jobs:
           node-version: 22
       - run: npm install --no-audit --no-fund
       - run: npm run build
-        env:
-          VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
-          VITE_FIREBASE_AUTH_DOMAIN: encomendas-apmg.firebaseapp.com
-          VITE_FIREBASE_PROJECT_ID: encomendas-apmg
-          VITE_FIREBASE_STORAGE_BUCKET: encomendas-apmg.firebasestorage.app
-          VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}
-          VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
-          VITE_FIREBASE_VAPID_KEY: ${{ secrets.VITE_FIREBASE_VAPID_KEY }}
-      - uses: FirebaseExtended/action-hosting-deploy@v0
+      # Abrir um endereço interno direto (ex.: /cadete) também carrega o app.
+      - run: cp dist/index.html dist/404.html
+      - uses: actions/upload-pages-artifact@v3
         with:
-          repoToken: ${{ secrets.GITHUB_TOKEN }}
-          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
-          projectId: encomendas-apmg
-          channelId: live
+          path: dist
+
+  publicar:
+    needs: compilar
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - id: deploy
+        uses: actions/deploy-pages@v4
