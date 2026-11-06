@@ -1,4 +1,7 @@
 // Notificações no celular (Firebase Cloud Messaging).
+// DESLIGADAS nesta versão: o botão "Ativar avisos" só aparece se houver a
+// chave VITE_FIREBASE_VAPID_KEY e a rotina de avisos (GitHub Actions) estiver
+// ligada com a chave da conta de serviço. Ver README, seção 5.
 // O app só guarda o "endereço" do celular; quem envia é a rotina agendada do
 // GitHub Actions (scripts/enviar-avisos.mjs). No iPhone, a notificação só
 // funciona com o app adicionado à tela inicial.
@@ -8,6 +11,7 @@ import { app } from '../firebase';
 import { agora, ref } from './base';
 
 export async function notificacoesDisponiveis() {
+  if (!import.meta.env.VITE_FIREBASE_VAPID_KEY) return false;
   return typeof window !== 'undefined' && 'Notification' in window && (await isSupported().catch(() => false));
 }
 
