@@ -49,16 +49,26 @@ function Rotas() {
   if (!pessoa) return <SemAcesso texto="Login sem cadastro no sistema. Se esta é a Conta da Guarda, peça ao administrador para concluir a configuração (veja o README)." />;
   if (!pessoa.ativo) return <SemAcesso texto="Cadastro inativo. Procure o administrador do sistema." />;
 
-  const inicio = ehGuarda ? '/guarda' : '/cadete';
+  // A Conta da Guarda só enxerga o Modo Guarda; os demais, só Cadete e Gestão.
+  // Qualquer outro endereço (inclusive o que ficou na barra antes do login)
+  // leva à tela inicial do modo certo.
+  if (ehGuarda) {
+    return (
+      <Routes>
+        <Route path="/guarda" element={<GuardaLayout />}>
+          <Route index element={<InicioGuarda />} />
+          <Route path="receber" element={<Receber />} />
+          <Route path="delivery" element={<Delivery />} />
+          <Route path="entregar" element={<Entregar />} />
+          <Route path="lote" element={<SaidaLote />} />
+        </Route>
+        <Route path="*" element={<Navigate to="/guarda" replace />} />
+      </Routes>
+    );
+  }
+
   return (
     <Routes>
-      <Route path="/guarda" element={<GuardaLayout />}>
-        <Route index element={<InicioGuarda />} />
-        <Route path="receber" element={<Receber />} />
-        <Route path="delivery" element={<Delivery />} />
-        <Route path="entregar" element={<Entregar />} />
-        <Route path="lote" element={<SaidaLote />} />
-      </Route>
       <Route element={<CadeteLayout />}>
         <Route path="/cadete" element={<Minhas />} />
         <Route path="/cadete/esperando" element={<Esperando />} />
@@ -72,7 +82,7 @@ function Rotas() {
           <Route path="cadastros" element={<Cadastros />} />
         </Route>
       </Route>
-      <Route path="*" element={<Navigate to={inicio} replace />} />
+      <Route path="*" element={<Navigate to="/cadete" replace />} />
     </Routes>
   );
 }
