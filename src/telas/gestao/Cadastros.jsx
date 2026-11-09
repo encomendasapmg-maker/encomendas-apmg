@@ -2,12 +2,17 @@
 // desativação de cadastros indevidos, perfis fixos e passagem de ano.
 import { useState } from 'react';
 import { query, where } from 'firebase/firestore';
-import { useCadastrosRecentes, definirAtivo, definirPerfil, passagemDeAno, encerrarCHOE, usePessoasAtivas } from '../../dados/pessoas';
+import { useCadastrosRecentes, definirAtivo, definirPerfil, gruposParaPromover, promoverGrupo, encerrarCHOE, usePessoasAtivas } from '../../dados/pessoas';
 import { col, useAoVivo } from '../../dados/base';
-import { PERFIS } from '../../lib/constantes';
+import { PERFIS, NOME_GRUPO } from '../../lib/constantes';
 import { tratamento, descricaoPessoa, quando } from '../../lib/texto';
 import { Topo, Modal, useAcao } from '../../componentes';
 import { useSessao } from '../../sessao';
+
+function rotuloGrupo(g) {
+  if (g.turma.startsWith('1º ano')) return g.turma;
+  return `${g.turma} · ${g.grupo ? `vindos da ${NOME_GRUPO[g.grupo]}` : 'sem turma de origem'}`;
+}
 
 const NOME_PERFIL = { cadete: 'Cadete', guarda: 'Conta da Guarda', oficial: 'Oficial de Dia', admin: 'Administrador' };
 
@@ -17,6 +22,7 @@ export default function Cadastros() {
   const [ativos] = usePessoasAtivas();
   const [alertas] = useAoVivo(ehAdmin ? query(col('alertas'), where('resolvido', '==', false)) : null, [ehAdmin]);
   const [passagem, setPassagem] = useState(false);
+  const [escolhido, setEscolhido] = useState(null);
   const [fimChoe, setFimChoe] = useState(false);
   const qtdChoe = (ativos || []).filter((p) => p.turma === 'CHOE' && p.perfil === 'cadete').length;
   const [executar, ocupado] = useAcao();
@@ -56,15 +62,23 @@ export default function Cadastros() {
             </div>
           </div>
         ))}
-        <button className="btn neutro" onClick={() => setPassagem(true)}>Passagem de ano do CFO (atualizar turmas)</button>
+        <button className="btn neutro" onClick={() => { setEscolhido(null); setPassagem(true); }}>Promover turma do CFO</button>
         <button className="btn neutro" onClick={() => setFimChoe(true)}>Encerrar o CHOE ({qtdChoe} Al. Of. ativo(s))</button>
       </main>
       {passagem && (
-        <Modal titulo="Passagem de ano" aoFechar={() => setPassagem(false)}>
-          <span className="muted">1º ano/1 e 1º ano/2 passam ao 2º ano, o 2º passa ao 3º, e o 3º ano é inativado (formados não são apagados). O CHOE não muda. Faça uma vez por ano.</span>
-          <button className="btn perigo" disabled={ocupado}
-            onClick={async () => { if (await executar(() => passagemDeAno(ativos || []), (n) => `${n} cadastro(s) atualizado(s).`)) setPassagem(false); }}>
-            Confirmar passagem de ano
+        <Modal titulo="Promover turma do CFO" aoFechar={() => setPassagem(false)}>
+          <span className="muted">As turmas do 1º ano andam com cerca de 6 meses de diferença: promova cada uma no seu momento. O 3º ano promovido é inativado (formados não são apagados). O CHOE não entra aqui.</span>
+          <div className="opcoes">
+            {gruposParaPromover(ativos || []).map((g) => (
+              <button key={g.chave} type="button" aria-pressed={escolhido?.chave === g.chave} onClick={() => setEscolhido(g)}>
+                {rotuloGrupo(g)} → {g.destino === 'formado' ? 'formatura' : g.destino}
+                <span className="extra">{g.pessoas.length} cadete(s)</span>
+              </button>
+            ))}
+          </div>
+          <button className="btn perigo" disabled={ocupado || !escolhido}
+            onClick={async () => { if (await executar(() => promoverGrupo(escolhido), (n) => `${n} cadastro(s) atualizado(s).`)) setPassagem(false); }}>
+            {escolhido ? `Confirmar: ${rotuloGrupo(escolhido)}` : 'Escolha a turma'}
           </button>
         </Modal>
       )}

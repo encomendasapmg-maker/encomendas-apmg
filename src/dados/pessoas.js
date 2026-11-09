@@ -10,7 +10,7 @@ function camposBusca(p) {
   return normalizar(`${p.nomeGuerra} ${p.nomeCompleto} ${p.numeroCadete}`).split(' ');
 }
 
-export async function cadastrar({ nomeCompleto, nomeGuerra, numeroCadete, turma, pelotao, email, senha, celular }) {
+export async function cadastrar({ nomeCompleto, nomeGuerra, numeroCadete, turma, grupo, pelotao, email, senha, celular }) {
   const numero = String(numeroCadete).replace(/\D/g, '');
   if (!numero) throw new Error('Informe o número do cadete.');
 
@@ -27,6 +27,7 @@ export async function cadastrar({ nomeCompleto, nomeGuerra, numeroCadete, turma,
     numeroCadete: numero,
     setor: SETOR_PILOTO,
     turma,
+    grupo: grupoDaTurma(turma, grupo),
     pelotao: pelotao || null,
     perfil: 'cadete',
     funcao: null,
@@ -79,26 +80,45 @@ export async function definirPerfil(uidPessoa, perfil) {
   await updateDoc(ref('pessoas', uidPessoa), { perfil, atualizadoEm: agora() });
 }
 
-// Passagem de ano do CFO: 1º ano (/1 e /2) → 2º ano → 3º ano; o 3º ano é
-// inativado (formados não são apagados). O CHOE não entra: tem botão próprio.
-export async function passagemDeAno(pessoas) {
-  const proxima = { '1º ano': '2º ano', '1º ano/1': '2º ano', '1º ano/2': '2º ano', '2º ano': '3º ano' };
-  let batch = writeBatch(db);
-  let n = 0;
+// Grupo (turma do 1º ano de origem): vem do nome no 1º ano; no 2º e 3º ano é informado.
+export function grupoDaTurma(turma, grupo) {
+  if (turma === '1º ano/1') return '1';
+  if (turma === '1º ano/2') return '2';
+  if (turma === '2º ano' || turma === '3º ano') return grupo || null;
+  return null;
+}
+
+// Para onde vai cada turma na promoção ("formado" = inativar, sem apagar).
+const PROXIMA = { '1º ano': '2º ano', '1º ano/1': '2º ano', '1º ano/2': '2º ano', '2º ano': '3º ano', '3º ano': 'formado' };
+
+// Grupos que podem ser promovidos agora: turma + turma de origem, com a quantidade.
+export function gruposParaPromover(pessoas) {
+  const mapa = new Map();
   for (const p of pessoas) {
-    if (p.perfil !== 'cadete' || p.turma === 'CHOE') continue;
-    const dados = proxima[p.turma]
-      ? { turma: proxima[p.turma], atualizadoEm: agora() }
-      : { ativo: false, inativadoPor: 'formatura', atualizadoEm: agora() };
-    batch.update(ref('pessoas', p.id), dados);
-    n += 1;
-    if (n % 400 === 0) {
-      await batch.commit();
-      batch = writeBatch(db);
-    }
+    if (p.perfil !== 'cadete' || !p.ativo || !PROXIMA[p.turma]) continue;
+    const grupo = p.turma.startsWith('1º ano') ? grupoDaTurma(p.turma) : p.grupo || null;
+    const chave = `${p.turma}|${grupo || ''}`;
+    if (!mapa.has(chave)) mapa.set(chave, { chave, turma: p.turma, grupo, destino: PROXIMA[p.turma], pessoas: [] });
+    mapa.get(chave).pessoas.push(p);
   }
-  await batch.commit();
-  return n;
+  const ordem = ['1º ano', '1º ano/1', '1º ano/2', '2º ano', '3º ano'];
+  return [...mapa.values()].sort((x, y) => ordem.indexOf(x.turma) - ordem.indexOf(y.turma) || String(x.grupo).localeCompare(String(y.grupo)));
+}
+
+// Promove um grupo: 1º ano/1 ou /2 → 2º ano; 2º → 3º; 3º → inativado (formatura).
+// O grupo de origem acompanha o cadete até a formatura.
+export async function promoverGrupo(g) {
+  for (let i = 0; i < g.pessoas.length; i += 400) {
+    const batch = writeBatch(db);
+    for (const p of g.pessoas.slice(i, i + 400)) {
+      const dados = g.destino === 'formado'
+        ? { ativo: false, inativadoPor: 'formatura', atualizadoEm: agora() }
+        : { turma: g.destino, grupo: g.grupo || null, atualizadoEm: agora() };
+      batch.update(ref('pessoas', p.id), dados);
+    }
+    await batch.commit();
+  }
+  return g.pessoas.length;
 }
 
 // Fim do CHOE: inativa a turma de Alunos Oficiais (os registros não são apagados).

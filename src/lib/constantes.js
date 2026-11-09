@@ -9,6 +9,12 @@ export const DESTINO_LOTE = 'Sala de TV – Bloco III';
 export const TURMA_CHOE = 'CHOE';
 export const TURMAS = ['1º ano/1', '1º ano/2', '2º ano', '3º ano', TURMA_CHOE];
 export const NOME_TURMA = { CHOE: 'CHOE (Al. Of.)' };
+
+// As duas turmas do 1º ano andam com cerca de 6 meses de diferença. O app guarda
+// de qual turma do 1º ano cada cadete veio ("grupo": '1' ou '2') para promover
+// cada uma no seu momento, também no 2º e no 3º ano.
+export const GRUPOS = ['1', '2'];
+export const NOME_GRUPO = { 1: 'turma 1', 2: 'turma 2' };
 export const PELOTOES = ['Alfa', 'Bravo', 'Charlie', 'Delta'];
 
 // Situações de uma encomenda (seção 8 do documento).

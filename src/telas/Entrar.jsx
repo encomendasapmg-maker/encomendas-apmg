@@ -4,7 +4,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { signInWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth';
 import { auth, configurado } from '../firebase';
 import { cadastrar } from '../dados/pessoas';
-import { TURMAS, PELOTOES, TURMA_CHOE, NOME_TURMA } from '../lib/constantes';
+import { TURMAS, PELOTOES, TURMA_CHOE, NOME_TURMA, GRUPOS } from '../lib/constantes';
 import { Topo, Chips, useAcao, useToast } from '../componentes';
 
 function AvisoConfiguracao() {
@@ -57,16 +57,18 @@ export function Entrar() {
 
 export function Cadastro() {
   const [f, setF] = useState({
-    nomeCompleto: '', nomeGuerra: '', numeroCadete: '', turma: '', pelotao: '', email: '', senha: '', celular: ''
+    nomeCompleto: '', nomeGuerra: '', numeroCadete: '', turma: '', grupo: '', pelotao: '', email: '', senha: '', celular: ''
   });
   const [executar, ocupado] = useAcao();
   const navegar = useNavigate();
   const muda = (campo) => (e) => setF({ ...f, [campo]: e.target.value });
+  const pedeGrupo = f.turma === '2º ano' || f.turma === '3º ano';
 
   const enviar = async (e) => {
     e.preventDefault();
     const choe = f.turma === TURMA_CHOE;
     if (!f.turma || (!choe && !f.pelotao)) return executar(() => Promise.reject(new Error('Escolha a turma e o pelotão.')));
+    if (pedeGrupo && !f.grupo) return executar(() => Promise.reject(new Error('Informe em qual turma você fez o 1º ano.')));
     const ok = await executar(() => cadastrar({ ...f, pelotao: f.pelotao || null }), 'Cadastro feito! Confirme seu e-mail quando puder.');
     if (ok) navegar('/');
   };
@@ -89,6 +91,12 @@ export function Cadastro() {
           <span className="rotulo">Turma</span>
           <Chips rotulo="Turma" opcoes={TURMAS.map((t) => ({ id: t, nome: NOME_TURMA[t] || t }))} valor={f.turma} aoMudar={(turma) => setF({ ...f, turma })} />
         </div>
+        {pedeGrupo && (
+          <div className="secao">
+            <span className="rotulo">Em qual turma você fez o 1º ano?</span>
+            <Chips rotulo="Turma do 1º ano" opcoes={GRUPOS.map((g) => ({ id: g, nome: `1º ano/${g}` }))} valor={f.grupo} aoMudar={(grupo) => setF({ ...f, grupo })} />
+          </div>
+        )}
         <div className="secao">
           <span className="rotulo">Pelotão{f.turma === TURMA_CHOE ? ' (opcional para o CHOE)' : ''}</span>
           <Chips rotulo="Pelotão" opcoes={PELOTOES.map((p) => ({ id: p, nome: p }))} valor={f.pelotao} aoMudar={(pelotao) => setF({ ...f, pelotao })} />
