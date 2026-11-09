@@ -27,7 +27,7 @@ export async function cadastrar({ nomeCompleto, nomeGuerra, numeroCadete, turma,
     numeroCadete: numero,
     setor: SETOR_PILOTO,
     turma,
-    pelotao,
+    pelotao: pelotao || null,
     perfil: 'cadete',
     funcao: null,
     ativo: true,
@@ -79,13 +79,14 @@ export async function definirPerfil(uidPessoa, perfil) {
   await updateDoc(ref('pessoas', uidPessoa), { perfil, atualizadoEm: agora() });
 }
 
-// Passagem de ano: 1º → 2º → 3º; o 3º ano é inativado (formados não são apagados).
+// Passagem de ano do CFO: 1º ano (/1 e /2) → 2º ano → 3º ano; o 3º ano é
+// inativado (formados não são apagados). O CHOE não entra: tem botão próprio.
 export async function passagemDeAno(pessoas) {
-  const proxima = { '1º ano': '2º ano', '2º ano': '3º ano' };
+  const proxima = { '1º ano': '2º ano', '1º ano/1': '2º ano', '1º ano/2': '2º ano', '2º ano': '3º ano' };
   let batch = writeBatch(db);
   let n = 0;
   for (const p of pessoas) {
-    if (p.perfil !== 'cadete') continue;
+    if (p.perfil !== 'cadete' || p.turma === 'CHOE') continue;
     const dados = proxima[p.turma]
       ? { turma: proxima[p.turma], atualizadoEm: agora() }
       : { ativo: false, inativadoPor: 'formatura', atualizadoEm: agora() };
@@ -98,4 +99,24 @@ export async function passagemDeAno(pessoas) {
   }
   await batch.commit();
   return n;
+}
+
+// Fim do CHOE: inativa a turma de Alunos Oficiais (os registros não são apagados).
+export async function encerrarCHOE(pessoas) {
+  const alvo = pessoas.filter((p) => p.perfil === 'cadete' && p.turma === 'CHOE' && p.ativo);
+  for (let i = 0; i < alvo.length; i += 400) {
+    const batch = writeBatch(db);
+    for (const p of alvo.slice(i, i + 400)) {
+      batch.update(ref('pessoas', p.id), { ativo: false, inativadoPor: 'fim_choe', atualizadoEm: agora() });
+    }
+    await batch.commit();
+  }
+  return alvo.length;
+}
+
+// O próprio usuário corrige a turma (ex.: cadastros antigos com "1º ano").
+export async function atualizarMinhaTurma(uidPessoa, turma, pelotao) {
+  const dados = { turma, atualizadoEm: agora() };
+  if (pelotao !== undefined) dados.pelotao = pelotao;
+  await updateDoc(ref('pessoas', uidPessoa), dados);
 }

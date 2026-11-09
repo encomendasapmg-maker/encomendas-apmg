@@ -73,9 +73,10 @@ export function buscarPessoas(pessoas, termo, limite = 8) {
     .map((x) => x.p);
 }
 
+// Cadete do CFO → "Cad. Fulano"; aluno do CHOE → "Al. Of. Fulano".
 export function tratamento(pessoa) {
   if (!pessoa) return '';
-  return `Cad. ${pessoa.nomeGuerra}`;
+  return `${pessoa.turma === 'CHOE' ? 'Al. Of.' : 'Cad.'} ${pessoa.nomeGuerra}`;
 }
 
 export function descricaoPessoa(pessoa) {

@@ -2,7 +2,7 @@
 // desativação de cadastros indevidos, perfis fixos e passagem de ano.
 import { useState } from 'react';
 import { query, where } from 'firebase/firestore';
-import { useCadastrosRecentes, definirAtivo, definirPerfil, passagemDeAno, usePessoasAtivas } from '../../dados/pessoas';
+import { useCadastrosRecentes, definirAtivo, definirPerfil, passagemDeAno, encerrarCHOE, usePessoasAtivas } from '../../dados/pessoas';
 import { col, useAoVivo } from '../../dados/base';
 import { PERFIS } from '../../lib/constantes';
 import { tratamento, descricaoPessoa, quando } from '../../lib/texto';
@@ -17,6 +17,8 @@ export default function Cadastros() {
   const [ativos] = usePessoasAtivas();
   const [alertas] = useAoVivo(ehAdmin ? query(col('alertas'), where('resolvido', '==', false)) : null, [ehAdmin]);
   const [passagem, setPassagem] = useState(false);
+  const [fimChoe, setFimChoe] = useState(false);
+  const qtdChoe = (ativos || []).filter((p) => p.turma === 'CHOE' && p.perfil === 'cadete').length;
   const [executar, ocupado] = useAcao();
 
   if (!ehAdmin) return <div className="centro">Somente o administrador acessa os cadastros.</div>;
@@ -54,14 +56,24 @@ export default function Cadastros() {
             </div>
           </div>
         ))}
-        <button className="btn neutro" onClick={() => setPassagem(true)}>Passagem de ano (atualizar turmas)</button>
+        <button className="btn neutro" onClick={() => setPassagem(true)}>Passagem de ano do CFO (atualizar turmas)</button>
+        <button className="btn neutro" onClick={() => setFimChoe(true)}>Encerrar o CHOE ({qtdChoe} Al. Of. ativo(s))</button>
       </main>
       {passagem && (
         <Modal titulo="Passagem de ano" aoFechar={() => setPassagem(false)}>
-          <span className="muted">1º ano passa a 2º, 2º passa a 3º, e o 3º ano é inativado (formados não são apagados). Faça uma vez por ano.</span>
+          <span className="muted">1º ano/1 e 1º ano/2 passam ao 2º ano, o 2º passa ao 3º, e o 3º ano é inativado (formados não são apagados). O CHOE não muda. Faça uma vez por ano.</span>
           <button className="btn perigo" disabled={ocupado}
             onClick={async () => { if (await executar(() => passagemDeAno(ativos || []), (n) => `${n} cadastro(s) atualizado(s).`)) setPassagem(false); }}>
             Confirmar passagem de ano
+          </button>
+        </Modal>
+      )}
+      {fimChoe && (
+        <Modal titulo="Encerrar o CHOE" aoFechar={() => setFimChoe(false)}>
+          <span className="muted">Os {qtdChoe} Aluno(s) Oficial(is) ativo(s) do CHOE serão inativados ao fim do curso. Os registros não são apagados.</span>
+          <button className="btn perigo" disabled={ocupado || qtdChoe === 0}
+            onClick={async () => { if (await executar(() => encerrarCHOE(ativos || []), (n) => `${n} cadastro(s) inativado(s).`)) setFimChoe(false); }}>
+            Confirmar encerramento
           </button>
         </Modal>
       )}

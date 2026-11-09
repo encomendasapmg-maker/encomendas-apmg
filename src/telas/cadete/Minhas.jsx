@@ -4,9 +4,10 @@ import { Link } from 'react-router-dom';
 import { useMinhasEncomendas, confirmarRetiradaSalaTV } from '../../dados/encomendas';
 import { useMeusPedidos, cancelarPedido } from '../../dados/pedidos';
 import { ativarNotificacoes, notificacoesDisponiveis, permissaoAtual } from '../../dados/notificacoes';
-import { NOME_SITUACAO, NOME_FUNCAO, SITUACAO, PREFIXO_QR } from '../../lib/constantes';
+import { NOME_SITUACAO, NOME_FUNCAO, SITUACAO, PREFIXO_QR, TURMAS, NOME_TURMA } from '../../lib/constantes';
+import { atualizarMinhaTurma } from '../../dados/pessoas';
 import { tratamento, descricaoPessoa, quando } from '../../lib/texto';
-import { Topo, Icone, Modal, ImagemQR, Carregando, useAcao } from '../../componentes';
+import { Topo, Icone, Modal, ImagemQR, Carregando, Chips, useAcao } from '../../componentes';
 import { useSessao } from '../../sessao';
 
 
@@ -15,6 +16,20 @@ const COR_SELO = { na_guarda: '', sala_tv: 'ambar', em_lote: 'ambar', retirada: 
 function linhaIdentificacao(e) {
   if (e.idNumero) return `${e.idTipo === 'nf' ? 'NF' : e.idTipo === 'pedido' ? 'Pedido' : 'Rastreio'} ${e.idNumero}`;
   return e.descricao || '';
+}
+
+// Cadastros feitos antes da divisão do 1º ano (turma "1º ano") escolhem a turma certa.
+function AtualizarTurma({ pessoa }) {
+  const [executar, ocupado] = useAcao();
+  if (!pessoa || pessoa.perfil === 'guarda' || TURMAS.includes(pessoa.turma)) return null;
+  return (
+    <div className="cartao destaque">
+      <span className="titulo">Atualize sua turma</span>
+      <span className="muted">O 1º ano agora tem duas turmas e o CHOE (Al. Of.) passou a existir no app. Toque na sua turma.</span>
+      <Chips rotulo="Turma" opcoes={TURMAS.map((t) => ({ id: t, nome: NOME_TURMA[t] || t }))} valor={null}
+        aoMudar={(t) => !ocupado && executar(() => atualizarMinhaTurma(pessoa.id, t), 'Turma atualizada.')} />
+    </div>
+  );
 }
 
 function CartaoEncomenda({ e, pessoa }) {
@@ -81,6 +96,7 @@ export default function Minhas() {
         </button>
       </Topo>
       <main className="conteudo" style={{ gap: 12 }}>
+        <AtualizarTurma pessoa={pessoa} />
         <AtivarAvisos uid={pessoa?.id} />
         {carregando && <Carregando />}
         {encomendas?.length === 0 && <div className="vazio">Nenhuma encomenda registrada para você ainda.</div>}

@@ -4,7 +4,11 @@ export const SETOR_PILOTO = 'EsFO';
 export const SETORES = ['EsFO', 'EsFAEP', 'ABM', 'Administrativo'];
 export const DESTINO_LOTE = 'Sala de TV – Bloco III';
 
-export const TURMAS = ['1º ano', '2º ano', '3º ano'];
+// Turmas do CFO (o 1º ano tem duas turmas) e o CHOE, curso dos Alunos Oficiais
+// (Al. Of.), com uma turma por ano e duração de cerca de 8 meses.
+export const TURMA_CHOE = 'CHOE';
+export const TURMAS = ['1º ano/1', '1º ano/2', '2º ano', '3º ano', TURMA_CHOE];
+export const NOME_TURMA = { CHOE: 'CHOE (Al. Of.)' };
 export const PELOTOES = ['Alfa', 'Bravo', 'Charlie', 'Delta'];
 
 // Situações de uma encomenda (seção 8 do documento).

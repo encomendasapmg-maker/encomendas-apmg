@@ -4,7 +4,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { signInWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth';
 import { auth, configurado } from '../firebase';
 import { cadastrar } from '../dados/pessoas';
-import { TURMAS, PELOTOES } from '../lib/constantes';
+import { TURMAS, PELOTOES, TURMA_CHOE, NOME_TURMA } from '../lib/constantes';
 import { Topo, Chips, useAcao, useToast } from '../componentes';
 
 function AvisoConfiguracao() {
@@ -47,7 +47,7 @@ export function Entrar() {
         <button type="button" className="botao-texto" onClick={esqueci}>Esqueci a senha</button>
         <div className="cartao">
           <span className="titulo">Primeiro acesso?</span>
-          <span className="muted">Faça seu cadastro com o número do cadete. O acesso é imediato.</span>
+          <span className="muted">Cadetes e Alunos Oficiais (CHOE): faça seu cadastro com o seu número. O acesso é imediato.</span>
           <Link to="/cadastro" className="btn">Fazer meu cadastro</Link>
         </div>
       </form>
@@ -65,8 +65,9 @@ export function Cadastro() {
 
   const enviar = async (e) => {
     e.preventDefault();
-    if (!f.turma || !f.pelotao) return executar(() => Promise.reject(new Error('Escolha a turma e o pelotão.')));
-    const ok = await executar(() => cadastrar(f), 'Cadastro feito! Confirme seu e-mail quando puder.');
+    const choe = f.turma === TURMA_CHOE;
+    if (!f.turma || (!choe && !f.pelotao)) return executar(() => Promise.reject(new Error('Escolha a turma e o pelotão.')));
+    const ok = await executar(() => cadastrar({ ...f, pelotao: f.pelotao || null }), 'Cadastro feito! Confirme seu e-mail quando puder.');
     if (ok) navegar('/');
   };
 
@@ -81,15 +82,15 @@ export function Cadastro() {
         <label className="campo">Nome de guerra
           <input value={f.nomeGuerra} onChange={muda('nomeGuerra')} required />
         </label>
-        <label className="campo">Número do cadete
+        <label className="campo">Número (de cadete ou de Al. Of.)
           <input value={f.numeroCadete} onChange={muda('numeroCadete')} inputMode="numeric" required />
         </label>
         <div className="secao">
           <span className="rotulo">Turma</span>
-          <Chips rotulo="Turma" opcoes={TURMAS.map((t) => ({ id: t, nome: t }))} valor={f.turma} aoMudar={(turma) => setF({ ...f, turma })} />
+          <Chips rotulo="Turma" opcoes={TURMAS.map((t) => ({ id: t, nome: NOME_TURMA[t] || t }))} valor={f.turma} aoMudar={(turma) => setF({ ...f, turma })} />
         </div>
         <div className="secao">
-          <span className="rotulo">Pelotão</span>
+          <span className="rotulo">Pelotão{f.turma === TURMA_CHOE ? ' (opcional para o CHOE)' : ''}</span>
           <Chips rotulo="Pelotão" opcoes={PELOTOES.map((p) => ({ id: p, nome: p }))} valor={f.pelotao} aoMudar={(pelotao) => setF({ ...f, pelotao })} />
         </div>
         <label className="campo">E-mail
@@ -102,7 +103,7 @@ export function Cadastro() {
           <input type="tel" value={f.celular} onChange={muda('celular')} autoComplete="tel" placeholder="(41) 9…" />
         </label>
         <span className="pequeno">
-          Seus dados servem só para avisar e entregar suas encomendas (LGPD). Outros cadetes veem apenas nome de guerra, turma e pelotão.
+          Seus dados servem só para avisar e entregar suas encomendas (LGPD). Os demais usuários veem apenas nome de guerra, turma e pelotão.
         </span>
         <button className="btn primario" disabled={ocupado}>Criar cadastro</button>
       </form>
