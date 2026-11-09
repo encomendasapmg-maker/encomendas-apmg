@@ -15,8 +15,12 @@ export async function ocupante(funcaoId) {
   return snap.exists() ? snap.data() : null;
 }
 
+// O Respondente é único e responde sempre pelo Oficial de Dia.
+const RESPONDENDO_POR = 'oficial_dia';
+
 // funcaoId = null significa "Nenhuma".
-export async function escolherFuncao(pessoa, funcaoId, { respondendoPor = null } = {}) {
+export async function escolherFuncao(pessoa, funcaoId) {
+  const respondendoPor = funcaoId === 'respondente' ? RESPONDENDO_POR : null;
   const batch = writeBatch(db);
   const nome = tratamento(pessoa);
 
@@ -31,7 +35,7 @@ export async function escolherFuncao(pessoa, funcaoId, { respondendoPor = null }
     batch.set(ref('funcoes', funcaoId), {
       uid: pessoa.id,
       nome,
-      respondendoPor: funcaoId === 'respondente' ? respondendoPor : null,
+      respondendoPor,
       desde: agora()
     });
     if (atual && atual.uid !== pessoa.id) {
@@ -47,7 +51,7 @@ export async function escolherFuncao(pessoa, funcaoId, { respondendoPor = null }
 
   batch.update(ref('pessoas', pessoa.id), {
     funcao: funcaoId,
-    respondendoPor: funcaoId === 'respondente' ? respondendoPor : null,
+    respondendoPor,
     atualizadoEm: agora()
   });
   batch.set(ref('assuncoes', novoId('assuncoes')), {

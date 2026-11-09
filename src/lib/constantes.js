@@ -36,7 +36,7 @@ export const TIPOS_ID = [
 export const FUNCOES = [
   { id: 'cmt_guarda', nome: 'Comandante da Guarda' },
   { id: 'dia_esfo', nome: 'Dia à EsFO' },
-  { id: 'respondente', nome: 'Respondente' },
+  { id: 'respondente', nome: 'Respondente pelo Oficial de Dia' },
   { id: 'cmt_bloco', nome: 'Comandante do Bloco' }
 ];
 export const NOME_FUNCAO = Object.fromEntries(FUNCOES.map((f) => [f.id, f.nome]));
