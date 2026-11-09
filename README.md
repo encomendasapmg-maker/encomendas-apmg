@@ -85,12 +85,16 @@ npm run dev      # abre em http://localhost:5173/encomendas-apmg/
 3. Daí em diante, o perfil dos outros (Oficial de Dia, Conta da Guarda) é trocado no próprio app, em **Gestão › Cadastros**.
 
 ### 4.2 Conta da Guarda
-1. Authentication › Usuários › **Adicionar usuário** (ex.: `guarda.encomendas.apmg@gmail.com` e uma senha guardada pelo setor responsável).
-2. Copie o **UID** criado.
-3. Firestore › Dados › coleção `pessoas` › **Adicionar documento** com o ID = UID e os campos:
-   `nomeCompleto` = "Conta da Guarda", `nomeGuerra` = "Guarda", `numeroCadete` = "0",
-   `setor` = "Guarda", `perfil` = "guarda", `ativo` = true (booleano), `funcao` = null.
+A Conta da Guarda é criada pelo próprio cadastro do app — não é preciso mexer no Firebase.
+1. No app, **Fazer meu cadastro** com: nome completo "Conta da Guarda", nome de guerra "Guarda",
+   número `0000`, qualquer turma e pelotão, e-mail `encomendas.apmg+guarda@gmail.com`
+   (apelido do Gmail do projeto: as mensagens chegam na caixa de `encomendas.apmg@gmail.com`)
+   e uma senha forte, diferente da senha do Gmail, guardada pelo setor responsável.
+2. Confirme o e-mail pelo link que chega no Gmail do projeto.
+3. O administrador, em **Gestão › Cadastros**, troca o perfil dessa pessoa para **Conta da Guarda**.
 4. Entre com essa conta no celular do posto e adicione o app à tela inicial.
+   A Conta da Guarda abre sempre no Modo Guarda e não aparece na busca de destinatários.
+5. Se a senha for esquecida, use **Esqueci a senha** na tela de entrar: o link chega no Gmail do projeto.
 
 ## 5. Notificações com o app fechado (desligadas)
 
