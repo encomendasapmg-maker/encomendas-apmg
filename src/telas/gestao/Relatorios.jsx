@@ -2,7 +2,7 @@
 // compartilhar) ou em planilha. Os demais relatórios (trilha, por serviço, por pessoa, lotes,
 // pendências, correções) seguem a mesma base e entram nas próximas versões.
 import { useState } from 'react';
-import { exportarLivroDigital, livroDigitalPDF } from '../../dados/relatorios';
+import { exportarLivroDigital, exportarMovimentacoes, livroDigitalPDF } from '../../dados/relatorios';
 import { Topo, Chips, useAcao } from '../../componentes';
 import { useSessao } from '../../sessao';
 
@@ -32,7 +32,7 @@ export default function Relatorios() {
   const podeCompartilhar = typeof navigator !== 'undefined' && typeof navigator.share === 'function';
   const pdf = (modo) => executar(
     () => livroDigitalPDF(...intervalo(periodo), eu, modo),
-    (r) => r?.cancelado ? 'Compartilhamento cancelado.' : r?.compartilhado ? 'PDF pronto para enviar.' : `PDF baixado · ${r?.quantidade ?? 0} movimentação(ões).`
+    (r) => r?.cancelado ? 'Compartilhamento cancelado.' : r?.compartilhado ? 'PDF pronto para enviar.' : `PDF baixado · ${r?.quantidade ?? 0} encomenda(s).`
   );
   const opcoes = [{ id: 'dia', nome: 'Hoje' }, ...(ehOficial ? [{ id: 'semana', nome: '7 dias' }, { id: 'mes', nome: '30 dias' }] : [])];
 
@@ -42,7 +42,7 @@ export default function Relatorios() {
       <main className="conteudo">
         <div className="cartao" style={{ gap: 12 }}>
           <span className="titulo">Livro digital do período</span>
-          <span className="muted">Todas as movimentações, com os períodos de contingência destacados.</span>
+          <span className="muted">Uma linha por encomenda: chegada, destinatário, setor, sentinela que recebeu, entregador, retirada e quem retirou. Inclui o que chegou ou foi retirado no período e o que ainda está pendente.</span>
           <Chips rotulo="Período" opcoes={opcoes} valor={periodo} aoMudar={setPeriodo} />
           {podeCompartilhar && (
             <button className="btn primario" disabled={ocupado} onClick={() => pdf('compartilhar')}>
@@ -53,9 +53,15 @@ export default function Relatorios() {
             Baixar PDF
           </button>
           <button className="btn" disabled={ocupado}
-            onClick={() => executar(() => exportarLivroDigital(...intervalo(periodo), eu), (n) => `${n} movimentação(ões) exportada(s).`)}>
+            onClick={() => executar(() => exportarLivroDigital(...intervalo(periodo), eu), (n) => `${n} encomenda(s) exportada(s).`)}>
             Baixar planilha (Excel)
           </button>
+          {ehOficial && (
+            <button className="btn" disabled={ocupado}
+              onClick={() => executar(() => exportarMovimentacoes(...intervalo(periodo), eu), (n) => `${n} movimentação(ões) exportada(s).`)}>
+              Planilha detalhada de movimentações
+            </button>
+          )}
           {!ehOficial && <span className="pequeno">O relatório do dia fica disponível às funções de serviço; os demais, ao Oficial de Dia e ao administrador.</span>}
         </div>
         <div className="cartao">
